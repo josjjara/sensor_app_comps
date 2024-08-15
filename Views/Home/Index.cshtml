@@ -1,0 +1,136 @@
+﻿
+@{
+    ViewData["Title"] = "Meteo Data Query";
+}
+
+<div class="container mt-5">
+    <h2 class="text-center">Meteo Consulta por Fechas</h2>
+
+    <form id="queryForm" class="mt-4">
+        <!-- Query Method -->
+
+        <div class="row ">
+            <div class="form-group mb-3 col-3">
+                <label for="QueryMethod">Seleccione un método de muestreo</label>
+                <select class="form-select" id="QueryMethod" name="QueryMethod" required>
+                    <option value="day">Día</option>
+                    <option value="month">Mes</option>
+                </select>
+            </div>
+
+            <div class="form-group mb-3 col-3 ">
+                    <label for="FechaDesde">Fecha Desde</label>
+                    <input type="date"  class="form-control date" id="FechaDesde" name="FechaDesde" required >
+            </div>
+
+            <div class="form-group mb-3 col-3">
+                    <label for="FechaHasta">Fecha Hasta</label>
+                    <input type="date" class="form-control date" id="FechaHasta" name="FechaHasta" required>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-primary" onclick="submitQuery()">Buscar Resultados</button>
+    </form>
+
+    <div id="chartContainer" class="mt-5 col-12 row">
+
+    </div>
+</div>
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+
+        async function submitQuery() {
+            const queryMethod = document.getElementById('QueryMethod').value;
+            const fechaDesde = document.getElementById('FechaDesde').value;
+            const fechaHasta = document.getElementById('FechaHasta').value;
+
+            const apiUrl = `/api/meteo/${queryMethod}/${fechaDesde}/${fechaHasta}`;
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error('Respuesta fallida del servidor');
+
+                const result = await response.json();
+
+                // Clear previous charts
+                const chartContainer = document.getElementById('chartContainer');
+                chartContainer.innerHTML = '';
+
+                // Check if the result is properly populated
+                console.log('Result:', result);
+
+                if (result.device_dates && result.device_data) {
+                    const deviceDates = result.device_dates;
+                    result.device_data.forEach(data => {
+                        const container = document.createElement('div');
+                        container.className = 'chart-container col-4';
+                        const title = document.createElement('h4');
+                        title.textContent = `${data.nombre_parametro} (${data.unidad_parametro})`;
+                        container.appendChild(title);
+
+                        const canvas = document.createElement('canvas');
+                        canvas.id = `chart-${data.codigo_parametro}`;
+                        container.appendChild(canvas);
+
+                        chartContainer.appendChild(container);
+
+                        const ctx = canvas.getContext('2d');
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: deviceDates,
+                                datasets: [
+                                    {
+                                        label: 'Avg',
+                                        data: data.values?.avg_data || [],
+                                        borderColor: 'rgba(75, 192, 192, 1)',
+                                        borderWidth: 1,
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Min',
+                                        data: data.values?.min_data || [],
+                                        borderColor: 'rgba(153, 102, 255, 1)',
+                                        borderWidth: 1,
+                                        fill: false
+                                    },
+                                    {
+                                        label: 'Max',
+                                        data: data.values?.max_data || [],
+                                        borderColor: 'rgba(255, 159, 64, 1)',
+                                        borderWidth: 1,
+                                        fill: false
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    x: {
+                                        display: true,
+                                        title: {
+                                            display: true,
+                                            text: 'Date'
+                                        }
+                                    },
+                                    y: {
+                                        display: true,
+                                        title: {
+                                            display: true,
+                                            text: data.unidad_parametro
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    });
+                } else {
+                    console.warn('No existen datos');
+                }
+            } catch (error) {
+                console.error('Error en la petición', error);
+            }
+        }
+    </script>
+}
